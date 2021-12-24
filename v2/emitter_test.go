@@ -8,6 +8,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//key
+const key = "I8Hzqy5xCJ3ohoHFVCOVWApg-1vgiyK-"
+
+// appid:channel
+const appid = "sturgm9rwhabef_h5gu5_ldgvm_5gsdn"
+const powerch = ""
+
+// 订阅topic时是否根据业务uid互斥
+const mutex = true
+
+// 业务端用户信息 appid:channel|uid
+// 改为sdk自动拼
+// var uname = appid + ":" + powerch + "|" + "50j8d";
+const uname = "50j8d"
+
+// 房间topic appid:channel/topic
+// 改为sdk自动拼
+// var topic =  appid + ":" + powerch + "/live/nyjq1";
+const topic = "live/nyjq1"
+const host = "tcps://im.open.seastart.cn:8883"
+
 func TestEndToEnd(t *testing.T) {
 	clientA(t)
 	clientB(t)
@@ -17,12 +38,11 @@ func TestEndToEnd(t *testing.T) {
 }
 
 func clientA(t *testing.T) {
-	const key = "RUvY5GTEOUmIqFs_zfpJcfTqBUIKBhfs" // read on sdk-integration-test/#/
 
 	// Create the client and connect to the broker
-	c, _ := Connect("", func(_ *Client, msg Message) {
+	c, _ := Connect(host, func(_ *Client, msg Message) {
 		fmt.Printf("[emitter] -> [A] received: '%s' topic: '%s'\n", msg.Payload(), msg.Topic())
-	})
+	}, WithAppid(appid), WithPowerch(powerch), WithUsername(uname))
 
 	// Subscribe to demo channel
 	fmt.Println("[emitter] <- [A] subscribing to 'demo/...'")
@@ -31,12 +51,11 @@ func clientA(t *testing.T) {
 }
 
 func clientB(t *testing.T) {
-	const key = "pGrtRRL6RrjAdExSArkMzBZOoWr2eB3L" // everything on sdk-integration-test/
 
 	// Create the client and connect to the broker
-	c, _ := Connect("", func(_ *Client, msg Message) {
+	c, _ := Connect(host, func(_ *Client, msg Message) {
 		fmt.Printf("[emitter] -> [B] received: '%s' topic: '%s'\n", msg.Payload(), msg.Topic())
-	})
+	}, WithAppid(appid), WithPowerch(powerch), WithUsername(uname))
 
 	c.OnPresence(func(_ *Client, ev PresenceEvent) {
 		fmt.Printf("[emitter] -> [B] presence event: %d subscriber(s) at topic: '%s'\n", len(ev.Who), ev.Channel)
@@ -63,6 +82,13 @@ func clientB(t *testing.T) {
 }
 
 func TestFormatTopic(t *testing.T) {
+	const key = "pGrtRRL6RrjAdExSArkMzBZOoWr2eB3L" // everything on sdk-integration-test/
+
+	// Create the client and connect to the broker
+	c, _ := Connect("", func(_ *Client, msg Message) {
+		fmt.Printf("[emitter] -> [B] received: '%s' topic: '%s'\n", msg.Payload(), msg.Topic())
+	})
+
 	tests := []struct {
 		key     string
 		channel string
@@ -72,6 +98,7 @@ func TestFormatTopic(t *testing.T) {
 		{channel: "a/b/c", result: "a/b/c/"},
 		{key: "key", channel: "channel", result: "key/channel/"},
 		{key: "key", channel: "a/b/c", result: "key/a/b/c/"},
+		{key: "key", channel: "channel", options: []Option{WithMutex()}, result: "key/channel/?mutex=1"},
 		{key: "key", channel: "a/b/c", options: []Option{WithoutEcho()}, result: "key/a/b/c/?me=0"},
 		{key: "key", channel: "a/b/c", options: []Option{WithoutEcho(), WithAtLeastOnce(), WithLast(100)}, result: "key/a/b/c/?me=0&last=100"},
 		{key: "key", channel: "a/b/c", options: []Option{WithAtLeastOnce(), WithoutEcho(), WithLast(100)}, result: "key/a/b/c/?me=0&last=100"},
@@ -79,7 +106,7 @@ func TestFormatTopic(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		topic := formatTopic(tc.key, tc.channel, tc.options)
+		topic := c.formatTopic(tc.key, tc.channel, tc.options)
 		assert.Equal(t, tc.result, topic)
 	}
 }

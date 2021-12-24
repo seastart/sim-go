@@ -10,6 +10,7 @@ import (
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/eclipse/paho.mqtt.golang/packets"
 )
 
 // Various emitter errors
@@ -17,6 +18,18 @@ var (
 	ErrTimeout   = errors.New("emitter: operation has timed out")
 	ErrUnmarshal = errors.New("emitter: unable to unmarshal the response")
 )
+
+func init() {
+	packets.ConnackReturnCodes[153] = "appid不能为空"
+	packets.ConnackReturnCodes[159] = "超出项目最大连接数限制"
+	packets.ConnErrors[0x99] = errors.New("appid不能为空")
+	packets.ConnErrors[0x9f] = errors.New("超出项目最大连接数限制")
+	// debug
+	// mqtt.ERROR = log.New(os.Stdout, "[ERROR] ", 0)
+	// mqtt.CRITICAL = log.New(os.Stdout, "[CRIT] ", 0)
+	// mqtt.WARN = log.New(os.Stdout, "[WARN]  ", 0)
+	// mqtt.DEBUG = log.New(os.Stdout, "[DEBUG] ", 0)
+}
 
 // Message defines the externals that a message implementation must support
 // these are received messages that are passed to the callbacks, not internal
@@ -462,6 +475,7 @@ func (c *Client) request(operation string, req interface{}) (Response, error) {
 
 // do waits for the operation to complete
 func (c *Client) do(t mqtt.Token) error {
+	// t.Wait()
 	if !t.WaitTimeout(c.timeout) {
 		return ErrTimeout
 	}
