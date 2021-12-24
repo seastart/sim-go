@@ -42,11 +42,33 @@ func WithClientID(id string) func(*Client) {
 	}
 }
 
+// 设置appid
+func WithAppid(appid string) func(*Client) {
+	return func(c *Client) {
+		c.appid = appid
+		WithUsername(c.ouname)
+	}
+}
+
+// 设置powerch
+func WithPowerch(powerch string) func(*Client) {
+	return func(c *Client) {
+		c.powerch = powerch
+		WithUsername(c.ouname)
+	}
+}
+
 // WithUsername will set the username to be used by this client when connecting
 // to the MQTT broker. Note: without the use of SSL/TLS, this information will
 // be sent in plaintext accross the wire.
 func WithUsername(username string) func(*Client) {
 	return func(c *Client) {
+		// appid powerch
+		// 业务端用户信息 appid:channel|uid
+		c.ouname = username
+		if c.appid != "" {
+			username = c.appid + ":" + c.powerch + "|" + username
+		}
 		c.opts.SetUsername(username)
 	}
 }
@@ -127,6 +149,11 @@ const (
 // String converts the option to a string.
 func (o option) String() string {
 	return string(o)
+}
+
+// 订阅topic时是否根据业务uid互斥
+func WithMutex() Option {
+	return option("mutex=1")
 }
 
 // WithoutEcho constructs an option which disables self-receiving messages if subscribed to a channel.

@@ -1,4 +1,4 @@
-module github.com/emitter-io/go/v2
+module github.com/seastart/sim-go/v2
 
 go 1.14
 

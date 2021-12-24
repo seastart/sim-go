@@ -30,6 +30,9 @@ type Message interface {
 type Client struct {
 	sync.RWMutex
 	guid       string              // Emiter's client ID
+	appid      string              // sim appid
+	powerch    string              // sim power channel
+	ouname     string              // 原始username
 	conn       mqtt.Client         // MQTT client
 	opts       *mqtt.ClientOptions // MQTT options
 	store      *store              // In-flight requests store
@@ -77,7 +80,7 @@ func NewClient(options ...func(*Client)) *Client {
 	c.opts.SetStore(c.store)
 
 	// Apply default configuration
-	WithBrokers("tcp://api.emitter.io:8080")(c)
+	// WithBrokers("tcp://api.emitter.io:8080")(c)
 
 	// Apply options
 	for _, opt := range options {
@@ -272,7 +275,7 @@ func (c *Client) Disconnect(waitTime time.Duration) {
 // Returns a token to track delivery of the message to the broker
 func (c *Client) Publish(key string, channel string, payload interface{}, options ...Option) error {
 	qos, retain := getHeader(options)
-	token := c.conn.Publish(formatTopic(key, channel, options), qos, retain, payload)
+	token := c.conn.Publish(c.formatTopic(key, channel, options), qos, retain, payload)
 	return c.do(token)
 }
 
@@ -302,7 +305,7 @@ func (c *Client) Subscribe(key string, channel string, optionalHandler MessageHa
 	}
 
 	// https://github.com/eclipse/paho.mqtt.golang/blob/master/topic.go#L78
-	topic := strings.ReplaceAll(formatTopic(key, channel, options), "#/", "#")
+	topic := strings.ReplaceAll(c.formatTopic(key, channel, options), "#/", "#")
 
 	// Issue subscribe
 	token := c.conn.Subscribe(topic, 0, nil)
@@ -335,7 +338,7 @@ func (c *Client) Unsubscribe(key string, channel string) error {
 	c.handlers.RemoveHandler(channel)
 
 	// Issue the unsubscribe
-	token := c.conn.Unsubscribe(formatTopic(key, channel, nil))
+	token := c.conn.Unsubscribe(c.formatTopic(key, channel, nil))
 	return c.do(token)
 }
 
@@ -343,7 +346,7 @@ func (c *Client) Unsubscribe(key string, channel string) error {
 func (c *Client) Presence(key, channel string, status, changes bool) error {
 	req, err := json.Marshal(&presenceRequest{
 		Key:     key,
-		Channel: channel,
+		Channel: c.appid + ":" + c.powerch + "/" + channel,
 		Status:  status,
 		Changes: changes,
 	})
@@ -414,7 +417,7 @@ func (c *Client) CreateLink(key, channel, name string, optionalHandler MessageHa
 	resp, err := c.request("link", &linkRequest{
 		Name:      name,
 		Key:       key,
-		Channel:   formatTopic("", channel, options),
+		Channel:   c.formatTopic("", channel, options),
 		Subscribe: optionalHandler != nil,
 	})
 
@@ -467,10 +470,14 @@ func (c *Client) do(t mqtt.Token) error {
 }
 
 // Makes a topic name from the key/channel pair
-func formatTopic(key, channel string, options []Option) string {
+func (c *Client) formatTopic(key, channel string, options []Option) string {
 	key = trim(key)
 	channel = trim(channel)
 	opts := formatOptions(options)
+	// 房间topic appid:channel/topic
+	if c.appid != "" {
+		channel = c.appid + ":" + c.powerch + "/" + channel
+	}
 	if len(key) == 0 {
 		return fmt.Sprintf("%s/%s", channel, opts)
 	}
