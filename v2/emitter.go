@@ -288,6 +288,7 @@ func (c *Client) Disconnect(waitTime time.Duration) {
 // Returns a token to track delivery of the message to the broker
 func (c *Client) Publish(key string, channel string, payload interface{}, options ...Option) error {
 	qos, retain := getHeader(options)
+	channel = c.formatChannel(channel)
 	token := c.conn.Publish(c.formatTopic(key, channel, options), qos, retain, payload)
 	return c.do(token)
 }
@@ -313,6 +314,7 @@ func (c *Client) PublishWithLink(name string, payload interface{}, options ...Op
 // Subscribe starts a new subscription. Provide a MessageHandler to be executed when
 // a message is published on the topic provided.
 func (c *Client) Subscribe(key string, channel string, optionalHandler MessageHandler, options ...Option) error {
+	channel = c.formatChannel(channel)
 	if optionalHandler != nil {
 		c.handlers.AddHandler(channel, optionalHandler)
 	}
@@ -346,7 +348,7 @@ func (c *Client) SubscribeWithHistory(key string, channel string, last int, opti
 // Messages published to those topics from other clients will no longer be
 // received.
 func (c *Client) Unsubscribe(key string, channel string) error {
-
+	channel = c.formatChannel(channel)
 	// Remove the handler if we have one
 	c.handlers.RemoveHandler(channel)
 
@@ -427,6 +429,7 @@ func (c *Client) AllowKey(secretKey, targetKey string) (bool, error) {
 
 // CreateLink sends a request to create a default link.
 func (c *Client) CreateLink(key, channel, name string, optionalHandler MessageHandler, options ...Option) (*Link, error) {
+	channel = c.formatChannel(channel)
 	resp, err := c.request("link", &linkRequest{
 		Name:      name,
 		Key:       key,
@@ -483,15 +486,21 @@ func (c *Client) do(t mqtt.Token) error {
 	return t.Error()
 }
 
+// 用appid powerch拼接format channel
+func (c *Client) formatChannel(channel string) string {
+	channel = trim(channel)
+	// 房间topic appid:channel/topic
+	if c.appid != "" {
+		channel = c.appid + ":" + c.powerch + "/" + channel
+	}
+	return channel
+}
+
 // Makes a topic name from the key/channel pair
 func (c *Client) formatTopic(key, channel string, options []Option) string {
 	key = trim(key)
 	channel = trim(channel)
 	opts := formatOptions(options)
-	// 房间topic appid:channel/topic
-	if c.appid != "" {
-		channel = c.appid + ":" + c.powerch + "/" + channel
-	}
 	if len(key) == 0 {
 		return fmt.Sprintf("%s/%s", channel, opts)
 	}
