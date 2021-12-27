@@ -98,6 +98,7 @@ type presenceMessage struct {
 	Request uint16          `json:"req,omitempty"`
 	Event   string          `json:"event"`
 	Channel string          `json:"channel"`
+	Stime   int             `json:"stime,omitempty"` // 上线时间，unsubscribe时才有
 	Time    int             `json:"time"`
 	Who     json.RawMessage `json:"who"`
 }
